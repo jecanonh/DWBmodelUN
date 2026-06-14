@@ -20,7 +20,6 @@ Imports:
     htmltools,
     ncdf4,
     raster,
-    rgdal
 Suggests: 
     hydroGOF,
     knitr,
