@@ -38,38 +38,95 @@
 #' 
 upForcing <- function(path_p = tempdir(), path_pet = tempdir(), file_type = "raster", format = "GTiff"){
   
-  if (!exists("path_pet")){
+  if (missing(path_pet) || is.null(path_pet) || !nzchar(path_pet)) {
     stop("Not filepath to read evapotranspiration data")
-  } else if (!exists("path_p")){
-    stop("Not filepath to read precipitation data")
-  } 
-  if (file_type == "raster"){
-    # ---- identify raster format and loading----
-    if (format == "GTiff"){
-      
-      if( length(list.files(path_pet, pattern = ".tif")) == 0 | length( list.files(path_p, pattern = ".tif")) == 0){
-        stop("Not avaliable data of precipitation or evapotranspiration")
-      }
-      pet_files <- list.files(path_pet)
-      pet <- raster::stack(paste(path_pet, pet_files, sep = ""))
-      p_files <- list.files(path_p)
-      p <- raster::stack(paste(path_p, p_files, sep = ""))
-    } else if(format == "NCDF"){
-      if( length( list.files(path_pet, pattern = ".nc")) == 0 | length( list.files(path_p, pattern = ".nc")) == 0){
-        stop("Not avaliable data of precipitation or evapotranspiration")
-      }
-      pet <- raster::brick(path_pet)
-      p <- raster::brick(path_p)
-    }
-    # ---- transformation to dataframes ----
-    p_v <- raster::rasterToPoints(p)
-    pet_v <- raster::rasterToPoints(pet)
-    } else {  # load forcings in csv files
-    pet_files <- list.files(path_pet)
-    p_files <- list.files(path_p)
-    p_v <- read.csv(paste(path_p, p_files,sep = ""))
-    pet_v <- read.csv(paste(path_pet, pet_files,sep = ""))
   }
+  
+  if (missing(path_p) || is.null(path_p) || !nzchar(path_p)) {
+    stop("Not filepath to read precipitation data")
+  }
+  
+  if (!file_type %in% c("raster", "csv")) {
+    stop("file_type must be 'raster' or 'csv'")
+  }
+  
+  if (file_type == "raster") {
+    
+    if (!requireNamespace("terra", quietly = TRUE)) {
+      stop("The 'terra' package is required. Install it with install.packages('terra').")
+    }
+    
+    format <- toupper(format)
+    
+    raster_to_table <- function(x) {
+      as.data.frame(x, xy = TRUE, na.rm = TRUE)
+    }
+    
+    get_files <- function(path, pattern) {
+      if (file.exists(path) && !dir.exists(path)) {
+        return(path)
+      }
+      
+      files <- list.files(path, pattern = pattern, full.names = TRUE)
+      
+      if (length(files) == 0) {
+        return(character(0))
+      }
+      
+      sort(files)
+    }
+    
+    if (format == "GTIFF") {
+      
+      pet_files <- get_files(path_pet, "\\.tif$|\\.tiff$")
+      p_files <- get_files(path_p, "\\.tif$|\\.tiff$")
+      
+      if (length(pet_files) == 0 || length(p_files) == 0) {
+        stop("Not available data of precipitation or evapotranspiration")
+      }
+      
+      pet <- terra::rast(pet_files)
+      p <- terra::rast(p_files)
+      
+    } else if (format == "NCDF") {
+      
+      pet_files <- get_files(path_pet, "\\.nc$")
+      p_files <- get_files(path_p, "\\.nc$")
+      
+      if (length(pet_files) == 0 || length(p_files) == 0) {
+        stop("Not available data of precipitation or evapotranspiration")
+      }
+      
+      pet <- terra::rast(pet_files)
+      p <- terra::rast(p_files)
+      
+    } else {
+      stop("format must be 'GTiff' or 'NCDF'")
+    }
+    
+    p_v <- raster_to_table(p)
+    pet_v <- raster_to_table(pet)
+    
+  } else {
+    
+    get_csv <- function(path) {
+      if (file.exists(path) && !dir.exists(path)) {
+        return(path)
+      }
+      
+      files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
+      
+      if (length(files) == 0) {
+        stop("Not available csv data")
+      }
+      
+      sort(files)[1]
+    }
+    
+    p_v <- read.csv(get_csv(path_p))
+    pet_v <- read.csv(get_csv(path_pet))
+  }
+  
   meteo <- list(PET = pet_v, Prec = p_v)
   return(meteo)
 }

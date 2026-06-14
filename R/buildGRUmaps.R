@@ -34,26 +34,75 @@
 #' 
 #' 
 buildGRUmaps <- function(gruLoc, parsValues){
-  gruNumber <- raster::cellStats(gruLoc, 'max')
   
-  if(dim(parsValues)[1] != gruNumber){
-    stop("There is a mismatch between the GRU defined in \n the raster file and the table which contains the values") 
+  if (missing(gruLoc) || missing(parsValues)) {
+    stop("Either gruLoc or parsValues are missing")
   }
   
-  alpha1 <- alpha2 <- smax <- d <- raster::raster(gruLoc)
-  
-  for (i in 1:dim(parsValues)[1]){
-    alpha1[gruLoc == i] <- parsValues[i, 1]
-    alpha2[gruLoc == i] <- parsValues[i, 2]
-    d[gruLoc == i] <- parsValues[i, 3]
-    smax[gruLoc == i] <- parsValues[i, 4]
+  if (!requireNamespace("terra", quietly = TRUE)) {
+    stop("The 'terra' package is required. Install it with install.packages('terra').")
   }
   
-  alpha1_v <- raster::rasterToPoints(alpha1)[,-c(1,2)]
-  alpha2_v <- raster::rasterToPoints(alpha2)[,-c(1,2)]
-  smax_v <- raster::rasterToPoints(smax)[,-c(1,2)]
-  d_v <- raster::rasterToPoints(d)[,-c(1,2)]
-  gruMaps <- list(alpha1 = alpha1_v, alpha2 = alpha2_v, d = d_v, smax = smax_v, 
-                  alpha1R = alpha1, alpha2R = alpha2, dR = d, smaxR = smax)
+  if (!inherits(gruLoc, "SpatRaster")) {
+    gruLoc <- terra::rast(gruLoc)
+  }
+  
+  if (terra::nlyr(gruLoc) > 1) {
+    warning("gruLoc has more than one layer. Only the first layer will be used.")
+    gruLoc <- gruLoc[[1]]
+  }
+  
+  if (ncol(parsValues) < 4) {
+    stop("parsValues must have at least four columns: alpha1, alpha2, d, and smax")
+  }
+  
+  gru_values <- terra::values(gruLoc, mat = FALSE)
+  gruNumber <- max(gru_values, na.rm = TRUE)
+  
+  if (nrow(parsValues) != gruNumber) {
+    stop("There is a mismatch between the GRU defined in \n the raster file and the table which contains the values")
+  }
+  
+  valid_cells <- !is.na(gru_values)
+  gru_index <- as.integer(gru_values)
+  
+  alpha1_values <- alpha2_values <- d_values <- smax_values <- rep(NA_real_, length(gru_values))
+  
+  alpha1_values[valid_cells] <- parsValues[gru_index[valid_cells], 1]
+  alpha2_values[valid_cells] <- parsValues[gru_index[valid_cells], 2]
+  d_values[valid_cells] <- parsValues[gru_index[valid_cells], 3]
+  smax_values[valid_cells] <- parsValues[gru_index[valid_cells], 4]
+  
+  alpha1 <- terra::setValues(terra::rast(gruLoc), alpha1_values)
+  alpha2 <- terra::setValues(terra::rast(gruLoc), alpha2_values)
+  d <- terra::setValues(terra::rast(gruLoc), d_values)
+  smax <- terra::setValues(terra::rast(gruLoc), smax_values)
+  
+  names(alpha1) <- "alpha1"
+  names(alpha2) <- "alpha2"
+  names(d) <- "d"
+  names(smax) <- "smax"
+  
+  raster_values <- function(x) {
+    pts <- as.data.frame(x, xy = TRUE, na.rm = TRUE)
+    pts[[ncol(pts)]]
+  }
+  
+  alpha1_v <- raster_values(alpha1)
+  alpha2_v <- raster_values(alpha2)
+  smax_v <- raster_values(smax)
+  d_v <- raster_values(d)
+  
+  gruMaps <- list(
+    alpha1 = alpha1_v,
+    alpha2 = alpha2_v,
+    d = d_v,
+    smax = smax_v,
+    alpha1R = alpha1,
+    alpha2R = alpha2,
+    dR = d,
+    smaxR = smax
+  )
+  
   return(gruMaps)
 }

@@ -38,21 +38,75 @@
 #' r <- dwb_results[[3]][,1:20]
 #' printVar(r, cells, var_name = "r", coord_sys, dates, as = "NetCDF", path_var = tempdir())
 #' 
-printVar <- function(variable, coor_cells, var_name, coord_sys, dates, as, path_var= ""){
-  if(path_var ==""){
+printVar <- function(variable, coor_cells, var_name, coord_sys, dates, as, path_var = ""){
+  
+  if (missing(variable) || missing(coor_cells) || missing(var_name) ||
+      missing(coord_sys) || missing(dates) || missing(as)) {
+    stop("variable, coor_cells, var_name, coord_sys, dates, and as must be provided")
+  }
+  
+  if (!requireNamespace("terra", quietly = TRUE)) {
+    stop("The 'terra' package is required. Install it with install.packages('terra').")
+  }
+  
+  if (path_var == "") {
     stop("There is no path_var, files can not be stored")
   }
-
-  var_r <- raster::rasterFromXYZ(cbind(coor_cells[ ,-3], variable), crs = coord_sys)
-  if (as == 'raster'){
-    # prints each time step in GTiff format, in the specified directory
-    for (i in 1:raster::nlayers(var_r)){
-      raster::writeRaster(var_r[[i]], filename = paste(path_var,"/", var_name, "_", as.character(dates[i]), ".tif", sep = ""), format = "GTiff", overwrite = TRUE)
+  
+  if (!dir.exists(path_var)) {
+    dir.create(path_var, recursive = TRUE)
+  }
+  
+  as <- match.arg(as, choices = c("raster", "NetCDF"))
+  
+  variable <- as.data.frame(variable)
+  coor_cells <- as.data.frame(coor_cells)
+  
+  if (ncol(coor_cells) < 2) {
+    stop("coor_cells must have at least two columns with x and y coordinates")
+  }
+  
+  if (nrow(variable) != nrow(coor_cells)) {
+    stop("variable and coor_cells must have the same number of rows")
+  }
+  
+  if (length(dates) < ncol(variable)) {
+    stop("dates must have at least as many values as the number of columns in variable")
+  }
+  
+  xyz_data <- data.frame(
+    x = coor_cells[[1]],
+    y = coor_cells[[2]],
+    variable
+  )
+  
+  var_r <- terra::rast(xyz_data, type = "xyz", crs = coord_sys)
+  names(var_r) <- paste0(var_name, "_", seq_len(terra::nlyr(var_r)))
+  
+  if (as == "raster") {
+    for (i in seq_len(terra::nlyr(var_r))) {
+      output_file <- file.path(
+        path_var,
+        paste0(var_name, "_", as.character(dates[i]), ".tif")
+      )
+      
+      terra::writeRaster(
+        var_r[[i]],
+        filename = output_file,
+        filetype = "GTiff",
+        overwrite = TRUE
+      )
     }
-  }
-  if (as == 'NetCDF'){
-    raster::writeRaster(var_r, filename = paste(path_var, "/",var_name, ".nc", sep = ""), format = 'CDF', overwrite = TRUE)
-  }else{ 
-    stop("Invalid file extension")
-  }
+  } else if (as == "NetCDF") {
+    output_file <- file.path(path_var, paste0(var_name, ".nc"))
+    
+    # Reemplazar terra::writeRaster por la función nativa recomendada
+    terra::writeCDF(
+      x = var_r,
+      filename = output_file,
+      varname = var_name,
+      overwrite = TRUE
+    )
+  } 
+  invisible(var_r)
 }

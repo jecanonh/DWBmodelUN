@@ -48,18 +48,39 @@
 #' init <- init_state(stack(In_storage, In_ground))
 #' 
 init_state <- function(raster){
-  if(raster::nlayers(raster) == 2){
-    In_storage <- raster::raster(raster[[1]])
-    In_ground <- raster::raster(raster[[2]])
-  } else{
-    if(raster::nlayers(raster) != 2){
+  
+  if (missing(raster)) {
+    stop("The raster parameter is missing")
+  }
+  
+  if (!requireNamespace("terra", quietly = TRUE)) {
+    stop("The 'terra' package is required. Install it with install.packages('terra').")
+  }
+  
+  if (!inherits(raster, "SpatRaster")) {
+    raster <- terra::rast(raster)
+  }
+  
+  raster_values <- function(x) {
+    pts <- as.data.frame(x, xy = TRUE, na.rm = TRUE)
+    pts[[ncol(pts)]]
+  }
+  
+  if (terra::nlyr(raster) == 2) {
+    In_storage <- raster[[1]]
+    In_ground <- raster[[2]]
+  } else {
+    if (terra::nlyr(raster) != 2) {
       warning("Strange number of initial state files\n Review files of initial states \n Creation by default from first raster")
     }
+    
     In_storage <- raster[[1]] / 2
     In_ground <- raster[[1]] / 2
   }
-  g_v <- raster::rasterToPoints(In_ground)[ ,-c(1,2)]
-  s_v <- raster::rasterToPoints(In_storage)[ ,-c(1,2)]
+  
+  g_v <- raster_values(In_ground)
+  s_v <- raster_values(In_storage)
+  
   init <- list(In_storage = s_v, In_ground = g_v)
   return(init)
 }

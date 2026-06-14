@@ -57,10 +57,7 @@ readSetup <- function(Read = TRUE, setup){
       rownames(setup) <- c("calibration", "print", "print_R", "print_S", "print_AET", "print_Qd",
                            "print_Qb", "D.ini", "D.ini.cal", "D.end", "D.end.cal")
     }else{
-      # asigns the dataframe created in the R environment
-      # final date of simulation
-      setup[10,1] <- paste(substr(setup[10, ], 1, 7), "-01", sep = "")  # changes the day speficfied to the first day of the month
-      # final date of calibration
+      setup[10,1] <- paste(substr(setup[10, ], 1, 7), "-01", sep = "")  
       setup[11,1] <- paste(substr(setup[11, ], 1, 7), "-01", sep = "")
     }
     return(setup)

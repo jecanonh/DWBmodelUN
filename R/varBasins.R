@@ -49,3 +49,7 @@ varBasins<-function(var, cellBasins){
   }
   return(list(varAverage = varAverage, varCells = varCells))
 }
+
+#Mejora por robustez. Por ejemplo, validar que cellBasins no esté vacío y 
+#que los índices existan dentro de var. 
+#No tenía elemntos rgdalque debiera actualizar
